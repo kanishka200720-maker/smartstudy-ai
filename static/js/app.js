@@ -68,6 +68,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleFiles(files) {
         const validExts = ['.pdf', '.txt'];
         for (let i = 0; i < files.length; i++) {
+            if (selectedFiles.length >= 5) {
+                showAlert('Maximum 5 files allowed per request.', 'error');
+                break;
+            }
+            
             const file = files[i];
             const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
             
@@ -77,10 +82,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 showAlert(`Unsupported file type: ${file.name}`, 'error');
                 continue;
             }
-            if (file.size > 5 * 1024 * 1024) {
-                showAlert(`File too large (${file.name}). Max 5MB.`, 'error');
+            if (file.size > 10 * 1024 * 1024) {
+                showAlert(`File too large (${file.name}). Max 10MB per file.`, 'error');
                 continue;
             }
+            
+            let currentTotalSize = selectedFiles.reduce((acc, curr) => acc + curr.size, 0);
+            if (currentTotalSize + file.size > 25 * 1024 * 1024) {
+                showAlert(`Adding ${file.name} exceeds the 25MB total combined size limit.`, 'error');
+                continue;
+            }
+            
             selectedFiles.push(file);
         }
         renderFileList();
@@ -92,6 +104,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const ul = document.getElementById('fileList');
         ul.innerHTML = '';
         
+        let totalSize = 0;
+        
         if (selectedFiles.length === 0) {
             listContainer.style.display = 'none';
             fileInput.value = '';
@@ -100,6 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         listContainer.style.display = 'block';
         selectedFiles.forEach((file, index) => {
+            totalSize += file.size;
             const li = document.createElement('li');
             li.style.display = 'flex';
             li.style.justifyContent = 'space-between';
@@ -119,6 +134,9 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             ul.appendChild(li);
         });
+        
+        document.getElementById('totalFileCount').textContent = `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''}`;
+        document.getElementById('totalFileSize').textContent = `${(totalSize / (1024 * 1024)).toFixed(2)} MB total`;
     }
     
     window.removeFile = function(index) {
@@ -170,12 +188,21 @@ document.addEventListener('DOMContentLoaded', () => {
             
             setTimeout(() => {
                 loadingIndicator.style.display = 'none';
+                
+                if (result.body.failed_files && result.body.failed_files.length > 0) {
+                    showAlert(`Warning: Failed to process ${result.body.failed_files.join(', ')}`, 'error');
+                }
+                
                 if (result.status !== 200) {
-                    showAlert(result.body.error || 'An error occurred during processing.', 'error');
+                    if (!result.body.failed_files || result.body.failed_files.length === 0) {
+                        showAlert(result.body.error || 'An error occurred during processing.', 'error');
+                    }
                     emptyState.style.display = 'block';
                 } else {
-                    showAlert('Document processed successfully!', 'success');
-                    calculateStats(result.body.preview, timeTaken);
+                    if (!result.body.failed_files || result.body.failed_files.length === 0) {
+                        showAlert('Document processed successfully!', 'success');
+                    }
+                    calculateStats(result.body.stats, timeTaken);
                     applyStudyMode(mode);
                     document.getElementById('modeBadge').textContent = result.body.mode;
                     showResults(result.body.results);
@@ -189,21 +216,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function calculateStats(textPreview, timeTaken) {
-        // Since we only get preview in this basic setup (unless backend returned full text size), 
-        // we'll estimate based on what we have, or assume standard sizes if truncated.
-        // Actually, backend returns preview up to 500 chars. Let's do a fake/estimative stats for UX purposes 
-        // since we didn't change the backend route to return full stats.
-        // Let's assume full text length is approx words in summary * 10 or similar, but for realism:
-        const assumedChars = textPreview.length >= 500 ? (Math.floor(Math.random() * 5000) + 1000) : textPreview.length;
-        const assumedWords = Math.floor(assumedChars / 5);
-        const pages = Math.max(1, Math.ceil(assumedWords / 250));
-        const readingTime = Math.max(1, Math.ceil(assumedWords / 200));
-        
-        document.getElementById('statPages').textContent = pages;
-        document.getElementById('statWords').textContent = assumedWords;
-        document.getElementById('statChars').textContent = assumedChars;
-        document.getElementById('statTime').textContent = readingTime + 'm';
+    function calculateStats(stats, timeTaken) {
+        if (!stats) return;
+        document.getElementById('statPages').textContent = stats.total_pages || 0;
+        document.getElementById('statWords').textContent = stats.total_words || 0;
+        document.getElementById('statChars').textContent = stats.total_characters || 0;
+        document.getElementById('statTime').textContent = (stats.total_reading_time || 0) + 'm';
         document.getElementById('statProc').textContent = timeTaken + 's';
     }
 

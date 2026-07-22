@@ -30,29 +30,45 @@ def upload_file():
     combined_text = ""
     is_multiple = False
     individual_files = []
+    failed_files = []
+    
+    total_words = 0
+    total_characters = 0
+    total_pages = 0
     
     if 'file' in request.files:
         files = request.files.getlist('file')
         # Check if empty upload
         if not files or files[0].filename == '':
-            if 'text' not in request.form:
+            if 'text' not in request.form or not request.form['text'].strip():
                 return jsonify({'error': 'No file provided'}), 400
         else:
             if len(files) > 1:
                 is_multiple = True
+            
+            # Limit to 5 files
+            files = files[:5]
                 
+            file_index = 1
             for file in files:
                 ext = os.path.splitext(file.filename)[1].lower()
                 if ext not in app.config['UPLOAD_EXTENSIONS']:
-                    return jsonify({'error': f'Unsupported file extension: {file.filename}'}), 400
+                    failed_files.append(file.filename)
+                    continue
                     
                 try:
                     raw_text = extract_text_from_file(file, ext)
                     clean_text = clean_extracted_text(raw_text)
                     if not clean_text.strip():
+                        failed_files.append(file.filename)
                         continue
                         
-                    combined_text += f"\n\n--- Document: {file.filename} ---\n\n" + clean_text
+                    total_characters += len(clean_text)
+                    total_words += len(clean_text.split())
+                    total_pages += max(1, len(clean_text.split()) // 250)
+                        
+                    combined_text += f"\n\n===== File {file_index}: {file.filename} =====\n\n" + clean_text
+                    file_index += 1
                     
                     if is_multiple:
                         try:
@@ -68,15 +84,20 @@ def upload_file():
                             "keywords": ind_res.get("keywords", [])
                         })
                 except Exception as e:
-                    return jsonify({'error': f'Error reading {file.filename}: {str(e)}'}), 400
+                    failed_files.append(file.filename)
             
     if 'text' in request.form and request.form['text'].strip():
         raw_text = request.form['text']
         clean_text = clean_extracted_text(raw_text)
         if clean_text:
-            combined_text += "\n\n--- Pasted Text ---\n\n" + clean_text
+            total_characters += len(clean_text)
+            total_words += len(clean_text.split())
+            total_pages += max(1, len(clean_text.split()) // 250)
+            combined_text += "\n\n===== Pasted Text =====\n\n" + clean_text
 
     if not combined_text.strip():
+        if failed_files:
+            return jsonify({'error': f'Failed to parse files: {", ".join(failed_files)}'}), 400
         return jsonify({'error': 'No readable text could be extracted'}), 400
 
     # Process Combined Text
@@ -97,12 +118,22 @@ def upload_file():
             "individual_files": individual_files,
             "combined": combined_results
         }
+        
+    stats = {
+        "total_files": len(individual_files) if is_multiple else (1 if 'file' in request.files and request.files.getlist('file')[0].filename != '' else 0),
+        "total_words": total_words,
+        "total_characters": total_characters,
+        "total_pages": total_pages,
+        "total_reading_time": max(1, total_words // 200)
+    }
 
     return jsonify({
         'message': 'Extraction and processing successful',
         'preview': combined_text[:500] + ('...' if len(combined_text) > 500 else ''),
         'results': final_results,
-        'mode': mode_used
+        'mode': mode_used,
+        'stats': stats,
+        'failed_files': failed_files
     })
 
 @app.route('/download_revision', methods=['POST'])
