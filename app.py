@@ -27,46 +27,81 @@ def upload_file():
     if 'file' not in request.files and 'text' not in request.form:
         return jsonify({'error': 'No file or text provided'}), 400
         
-    text_content = ""
+    combined_text = ""
+    is_multiple = False
+    individual_files = []
     
-    if 'file' in request.files and request.files['file'].filename != '':
-        file = request.files['file']
-        ext = os.path.splitext(file.filename)[1].lower()
-        if ext not in app.config['UPLOAD_EXTENSIONS']:
-            return jsonify({'error': 'Unsupported file extension'}), 400
+    if 'file' in request.files:
+        files = request.files.getlist('file')
+        # Check if empty upload
+        if not files or files[0].filename == '':
+            if 'text' not in request.form:
+                return jsonify({'error': 'No file provided'}), 400
+        else:
+            if len(files) > 1:
+                is_multiple = True
+                
+            for file in files:
+                ext = os.path.splitext(file.filename)[1].lower()
+                if ext not in app.config['UPLOAD_EXTENSIONS']:
+                    return jsonify({'error': f'Unsupported file extension: {file.filename}'}), 400
+                    
+                try:
+                    raw_text = extract_text_from_file(file, ext)
+                    clean_text = clean_extracted_text(raw_text)
+                    if not clean_text.strip():
+                        continue
+                        
+                    combined_text += f"\n\n--- Document: {file.filename} ---\n\n" + clean_text
+                    
+                    if is_multiple:
+                        try:
+                            from services.llm_generator import generate_ai_study_material
+                            ind_res = generate_ai_study_material(clean_text)
+                        except Exception:
+                            from services.lightweight_generator import process_document
+                            ind_res = process_document(clean_text)
+                            
+                        individual_files.append({
+                            "filename": file.filename,
+                            "summary": ind_res.get("summary", ""),
+                            "keywords": ind_res.get("keywords", [])
+                        })
+                except Exception as e:
+                    return jsonify({'error': f'Error reading {file.filename}: {str(e)}'}), 400
             
-        try:
-            # Read in memory
-            raw_text = extract_text_from_file(file, ext)
-            text_content = clean_extracted_text(raw_text)
-        except Exception as e:
-            return jsonify({'error': str(e)}), 400
-            
-    elif 'text' in request.form:
+    if 'text' in request.form and request.form['text'].strip():
         raw_text = request.form['text']
-        if not raw_text.strip():
-            return jsonify({'error': 'Provided text is empty'}), 400
-        text_content = clean_extracted_text(raw_text)
+        clean_text = clean_extracted_text(raw_text)
+        if clean_text:
+            combined_text += "\n\n--- Pasted Text ---\n\n" + clean_text
 
-    if not text_content:
+    if not combined_text.strip():
         return jsonify({'error': 'No readable text could be extracted'}), 400
 
-    # Phase 4: Try LLM Generator first
+    # Process Combined Text
     try:
         from services.llm_generator import generate_ai_study_material
-        results = generate_ai_study_material(text_content)
+        combined_results = generate_ai_study_material(combined_text)
         mode_used = "🟢 AI Mode"
     except Exception as e:
-        # Fallback to Smart Processing Engine
         print(f"Fallback triggered due to: {e}")
         from services.lightweight_generator import process_document
-        results = process_document(text_content)
+        combined_results = process_document(combined_text)
         mode_used = "🟡 Lightweight Mode"
 
+    final_results = combined_results
+    if is_multiple:
+        final_results = {
+            "is_multiple": True,
+            "individual_files": individual_files,
+            "combined": combined_results
+        }
+
     return jsonify({
-        'message': f'Extraction and processing successful',
-        'preview': text_content[:500] + ('...' if len(text_content) > 500 else ''),
-        'results': results,
+        'message': 'Extraction and processing successful',
+        'preview': combined_text[:500] + ('...' if len(combined_text) > 500 else ''),
+        'results': final_results,
         'mode': mode_used
     })
 

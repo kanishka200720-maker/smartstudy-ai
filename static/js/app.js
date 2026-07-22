@@ -47,43 +47,90 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileNameDisplay = document.getElementById('fileNameDisplay');
     
     let currentRevisionNotes = "";
-    let selectedFile = null;
+    let selectedFiles = [];
     let beginnerExplanationText = "";
 
     dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
     dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault(); dropZone.classList.remove('dragover');
-        if (e.dataTransfer.files.length) handleFileSelect(e.dataTransfer.files[0]);
+        if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
     });
     fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length) handleFileSelect(e.target.files[0]);
+        if (e.target.files.length) handleFiles(e.target.files);
     });
 
-    function handleFileSelect(file) {
+    document.getElementById('clearAllBtn').addEventListener('click', () => {
+        selectedFiles = [];
+        renderFileList();
+    });
+
+    function handleFiles(files) {
         const validExts = ['.pdf', '.txt'];
-        const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-        if (!validExts.includes(ext)) {
-            showAlert('Unsupported file type. Please select a valid PDF or TXT file.', 'error');
-            selectedFile = null;
-            fileNameDisplay.textContent = "";
-            fileInput.value = "";
-            return;
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+            
+            if (selectedFiles.some(f => f.name === file.name && f.size === file.size)) continue;
+            
+            if (!validExts.includes(ext)) {
+                showAlert(`Unsupported file type: ${file.name}`, 'error');
+                continue;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                showAlert(`File too large (${file.name}). Max 5MB.`, 'error');
+                continue;
+            }
+            selectedFiles.push(file);
         }
-        if (file.size > 5 * 1024 * 1024) {
-            showAlert('File too large. Max 5MB.', 'error');
-            return;
-        }
-        selectedFile = file;
-        fileNameDisplay.textContent = "Selected: " + file.name;
+        renderFileList();
         hideAlerts();
     }
+    
+    function renderFileList() {
+        const listContainer = document.getElementById('fileListContainer');
+        const ul = document.getElementById('fileList');
+        ul.innerHTML = '';
+        
+        if (selectedFiles.length === 0) {
+            listContainer.style.display = 'none';
+            fileInput.value = '';
+            return;
+        }
+        
+        listContainer.style.display = 'block';
+        selectedFiles.forEach((file, index) => {
+            const li = document.createElement('li');
+            li.style.display = 'flex';
+            li.style.justifyContent = 'space-between';
+            li.style.alignItems = 'center';
+            li.style.padding = '8px 12px';
+            li.style.background = 'rgba(255,255,255,0.05)';
+            li.style.borderRadius = '8px';
+            li.style.border = '1px solid var(--glass-border)';
+            
+            const sizeKB = (file.size / 1024).toFixed(1);
+            li.innerHTML = `
+                <div style="display:flex; flex-direction:column;">
+                    <span style="font-weight:600; font-size:0.9rem;">📄 ${file.name}</span>
+                    <span style="font-size:0.8rem; color:var(--text-muted);">${sizeKB} KB</span>
+                </div>
+                <button type="button" class="btn secondary-btn" style="padding:4px 8px; font-size:0.8rem;" onclick="removeFile(${index})">❌</button>
+            `;
+            ul.appendChild(li);
+        });
+    }
+    
+    window.removeFile = function(index) {
+        selectedFiles.splice(index, 1);
+        renderFileList();
+    };
 
     uploadForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        if (!selectedFile) { showAlert("Please select or drop a file first.", "error"); return; }
+        if (selectedFiles.length === 0) { showAlert("Please select or drop files first.", "error"); return; }
         const formData = new FormData();
-        formData.append('file', selectedFile);
+        selectedFiles.forEach(f => formData.append('file', f));
         submitData(formData, document.getElementById('studyModeUpload').value);
     });
 
@@ -193,20 +240,68 @@ document.addEventListener('DOMContentLoaded', () => {
     function hideAlerts() { alertContainer.innerHTML = ""; }
 
     function showResults(results) {
-        currentRevisionNotes = results.revision_notes;
-        beginnerExplanationText = results.beginner_explanation;
+        const indContainer = document.getElementById('individualDocsContainer');
+        indContainer.innerHTML = '';
+        
+        let displayResults = results;
+        if (results.is_multiple) {
+            document.getElementById('summaryTitle').textContent = 'Combined Summary';
+            displayResults = results.combined;
+            
+            results.individual_files.forEach((doc) => {
+                const docDiv = document.createElement('div');
+                docDiv.style.marginBottom = '15px';
+                docDiv.style.border = '1px solid var(--glass-border)';
+                docDiv.style.borderRadius = '12px';
+                docDiv.style.overflow = 'hidden';
+                docDiv.style.background = 'rgba(255,255,255,0.03)';
+                
+                const header = document.createElement('div');
+                header.style.padding = '12px 15px';
+                header.style.background = 'rgba(106, 17, 203, 0.15)';
+                header.style.cursor = 'pointer';
+                header.style.fontWeight = 'bold';
+                header.style.display = 'flex';
+                header.style.justifyContent = 'space-between';
+                header.innerHTML = `<span>📄 ${doc.filename}</span><span>▼</span>`;
+                
+                const content = document.createElement('div');
+                content.style.padding = '15px';
+                content.style.display = 'none';
+                content.innerHTML = `
+                    <h4 style="margin-top:0; color:var(--text-color);">Summary</h4>
+                    <p style="font-size:0.95rem; color:var(--text-muted);">${doc.summary || 'No summary generated.'}</p>
+                    <h4 style="color:var(--text-color);">Keywords</h4>
+                    <div class="keyword-tags">${(doc.keywords || []).map(k => `<span class="keyword-tag">${k}</span>`).join('')}</div>
+                `;
+                
+                header.addEventListener('click', () => {
+                    content.style.display = content.style.display === 'none' ? 'block' : 'none';
+                    header.querySelector('span:last-child').textContent = content.style.display === 'none' ? '▼' : '▲';
+                });
+                
+                docDiv.appendChild(header);
+                docDiv.appendChild(content);
+                indContainer.appendChild(docDiv);
+            });
+        } else {
+            document.getElementById('summaryTitle').textContent = 'Summary';
+        }
+
+        currentRevisionNotes = displayResults.revision_notes || results.revision_notes;
+        beginnerExplanationText = displayResults.beginner_explanation || results.beginner_explanation;
         
         // Hide beginner explanation by default
         document.getElementById('beginnerExplanationCard').style.display = 'none';
         
         // Summary
-        document.getElementById('res-summary').textContent = results.summary || "No summary generated.";
+        document.getElementById('res-summary').textContent = displayResults.summary || "No summary generated.";
         
         // Points
         const pointsEl = document.getElementById('res-points');
         pointsEl.innerHTML = "";
-        if (results.points && results.points.length > 0) {
-            results.points.forEach(pt => {
+        if (displayResults.points && displayResults.points.length > 0) {
+            displayResults.points.forEach(pt => {
                 const li = document.createElement('li');
                 li.textContent = pt;
                 pointsEl.appendChild(li);
@@ -219,8 +314,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const kwEl = document.getElementById('res-keywords');
         kwEl.innerHTML = "";
         const kwList = [];
-        if (results.keywords && results.keywords.length > 0) {
-            results.keywords.forEach(kw => {
+        if (displayResults.keywords && displayResults.keywords.length > 0) {
+            displayResults.keywords.forEach(kw => {
                 const span = document.createElement('span');
                 span.className = 'keyword-tag';
                 span.textContent = kw;
@@ -237,8 +332,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const qaEl = document.getElementById('res-questions');
         qaEl.innerHTML = "";
         let qaRaw = "";
-        if (results.questions && results.questions.length > 0) {
-            results.questions.forEach((q, i) => {
+        if (displayResults.questions && displayResults.questions.length > 0) {
+            displayResults.questions.forEach((q, i) => {
                 const div = document.createElement('div');
                 div.innerHTML = `<strong>Q${i+1}: ${q.question}</strong><br><span style="color:var(--text-muted)">A: ${q.answer}</span>`;
                 qaEl.appendChild(div);
@@ -251,8 +346,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const mcqEl = document.getElementById('res-mcqs');
         mcqEl.innerHTML = "";
         let mcqRaw = "";
-        if (results.mcqs && results.mcqs.length > 0) {
-            results.mcqs.forEach((m, i) => {
+        if (displayResults.mcqs && displayResults.mcqs.length > 0) {
+            displayResults.mcqs.forEach((m, i) => {
                 const div = document.createElement('div');
                 let html = `<strong>Q${i+1}: ${m.question}</strong><br>`;
                 mcqRaw += `Q${i+1}: ${m.question}\n`;

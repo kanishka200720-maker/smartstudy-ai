@@ -18,9 +18,16 @@
                 <div class="drop-icon">📄</div>
                 <p>Drag & Drop your PDF or TXT file here</p>
                 <p class="text-muted">or</p>
-                <input type="file" id="file" name="file" accept=".pdf,.txt" class="file-input-hidden" aria-label="Upload study material file">
+                <input type="file" id="file" name="file" accept=".pdf,.txt" class="file-input-hidden" aria-label="Upload study material file" multiple>
                 <button type="button" class="btn secondary-btn" onclick="document.getElementById('file').click()">Browse Files</button>
-                <div id="fileNameDisplay" class="file-name-display"></div>
+            </div>
+            
+            <div id="fileListContainer" style="display: none; margin-top: 15px; text-align: left;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h4 style="margin: 0; color: var(--text-color);">Selected Files:</h4>
+                    <button type="button" id="clearAllBtn" class="btn secondary-btn" style="padding: 4px 10px; font-size: 0.8rem; background: rgba(255,50,50,0.1); border-color: rgba(255,50,50,0.3); color: #ff6b6b;">Clear All 🗑️</button>
+                </div>
+                <ul id="fileList" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;"></ul>
             </div>
             
             <div class="form-group mode-selector-container">
@@ -103,8 +110,11 @@
     
     <div class="results-content-wrapper" id="pdfExportArea">
         <div id="res-summary-tab" class="result-content active">
+            <!-- Container for individual files -->
+            <div id="individualDocsContainer" style="margin-bottom: 20px;"></div>
+            
             <div class="content-header">
-                <h3>Summary</h3>
+                <h3 id="summaryTitle">Summary</h3>
                 <button class="copy-btn btn secondary-btn" data-copy="res-summary">📋 Copy</button>
             </div>
             <div id="res-summary" class="preview-box"></div>
