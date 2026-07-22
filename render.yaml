@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: smartstudy-lite-ai
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    envVars:
+      - key: LOCAL_MODEL_PATH
+        value: "" # Leave empty if you want to use Lightweight Mode

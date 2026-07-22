@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<section class="hero-section">
+    <h1 class="hero-title">SmartStudy Lite AI</h1>
+    <p class="hero-subtitle">AI-powered Study Assistant</p>
+</section>
+
+<section class="upload-section glass-card">
+    <div class="tabs main-tabs" role="tablist" aria-label="Input Methods">
+        <button class="tab-btn active" data-target="upload-tab" role="tab" aria-selected="true" aria-controls="upload-tab">Upload File</button>
+        <button class="tab-btn" data-target="paste-tab" role="tab" aria-selected="false" aria-controls="paste-tab">Paste Text</button>
+    </div>
+
+    <div id="upload-tab" class="tab-content active" role="tabpanel" aria-labelledby="upload-tab">
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div id="dropZone" class="drop-zone">
+                <div class="drop-icon">📄</div>
+                <p>Drag & Drop your PDF or TXT file here</p>
+                <p class="text-muted">or</p>
+                <input type="file" id="file" name="file" accept=".pdf,.txt" class="file-input-hidden" aria-label="Upload study material file">
+                <button type="button" class="btn secondary-btn" onclick="document.getElementById('file').click()">Browse Files</button>
+                <div id="fileNameDisplay" class="file-name-display"></div>
+            </div>
+            
+            <div class="form-group mode-selector-container">
+                <label for="studyModeUpload">Study Mode:</label>
+                <select id="studyModeUpload" class="mode-select">
+                    <option value="quick">Quick Revision</option>
+                    <option value="exam">Exam Preparation</option>
+                    <option value="beginner">Beginner Learning</option>
+                    <option value="practice">Question Practice</option>
+                </select>
+            </div>
+            
+            <button type="submit" class="btn primary-btn giant-btn" id="generateUploadBtn">✨ Generate Study Material</button>
+        </form>
+    </div>
+
+    <div id="paste-tab" class="tab-content" style="display: none;" role="tabpanel" aria-labelledby="paste-tab">
+        <form id="pasteForm">
+            <div class="form-group">
+                <textarea id="text" name="text" rows="8" placeholder="Paste your study material here to generate notes..." aria-label="Study material text"></textarea>
+            </div>
+            
+            <div class="form-group mode-selector-container">
+                <label for="studyModePaste">Study Mode:</label>
+                <select id="studyModePaste" class="mode-select">
+                    <option value="quick">Quick Revision</option>
+                    <option value="exam">Exam Preparation</option>
+                    <option value="beginner">Beginner Learning</option>
+                    <option value="practice">Question Practice</option>
+                </select>
+            </div>
+            
+            <button type="submit" class="btn primary-btn giant-btn" id="generatePasteBtn">✨ Generate Study Material</button>
+        </form>
+    </div>
+    
+    <!-- Animated Processing Loader -->
+    <div id="loadingIndicator" class="loading-overlay" style="display: none;">
+        <div class="progress-box glass-card">
+            <h3 id="loaderStatusText" style="margin-top:0">📄 Reading Document...</h3>
+            <div class="progress-bar-container">
+                <div id="loaderProgressBar" class="progress-bar-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="alertContainer" aria-live="polite"></div>
+</section>
+
+<!-- Empty State -->
+<div id="emptyState" class="empty-state">
+    <div class="empty-icon">📚</div>
+    <h3>Upload your study material to begin.</h3>
+    <p class="text-muted">Supports: PDF, TXT, Paste Text</p>
+</div>
+
+<section class="results-section glass-card" id="resultsSection" style="display: none;">
+    <!-- Document Statistics Row -->
+    <div class="stats-row" id="statsRow">
+        <div class="stat-card"><span class="stat-icon">📄</span><span class="stat-val" id="statPages">0</span><br><span class="stat-label">Pages</span></div>
+        <div class="stat-card"><span class="stat-icon">📝</span><span class="stat-val" id="statWords">0</span><br><span class="stat-label">Words</span></div>
+        <div class="stat-card"><span class="stat-icon">🔤</span><span class="stat-val" id="statChars">0</span><br><span class="stat-label">Characters</span></div>
+        <div class="stat-card"><span class="stat-icon">⏱</span><span class="stat-val" id="statTime">0m</span><br><span class="stat-label">Reading Time</span></div>
+        <div class="stat-card"><span class="stat-icon">📅</span><span class="stat-val" id="statProc">0s</span><br><span class="stat-label">Process Time</span></div>
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+        <h2 style="margin: 0;">Processing Results</h2>
+        <span id="modeBadge" style="background: rgba(255,255,255,0.1); padding: 5px 15px; border-radius: 20px; border: 1px solid var(--glass-border); font-weight: 600; font-size: 0.9rem;"></span>
+    </div>
+    
+    <div class="tabs result-tabs" role="tablist" aria-label="Result Tabs">
+        <button class="tab-btn result-tab-btn active" data-target="res-summary-tab" id="tab-summary" role="tab" aria-selected="true" aria-controls="res-summary-tab">📄 Summary</button>
+        <button class="tab-btn result-tab-btn" data-target="res-points-tab" id="tab-points" role="tab" aria-selected="false" aria-controls="res-points-tab">⭐ Key Points</button>
+        <button class="tab-btn result-tab-btn" data-target="res-keywords-tab" id="tab-keywords" role="tab" aria-selected="false" aria-controls="res-keywords-tab">🔑 Keywords</button>
+        <button class="tab-btn result-tab-btn" data-target="res-questions-tab" id="tab-questions" role="tab" aria-selected="false" aria-controls="res-questions-tab">❓ Questions</button>
+        <button class="tab-btn result-tab-btn" data-target="res-mcqs-tab" id="tab-mcqs" role="tab" aria-selected="false" aria-controls="res-mcqs-tab">✅ MCQs</button>
+        <button class="tab-btn result-tab-btn" data-target="res-revision-tab" id="tab-revision" role="tab" aria-selected="false" aria-controls="res-revision-tab">📥 Revision Notes</button>
+    </div>
+    
+    <div class="results-content-wrapper" id="pdfExportArea">
+        <div id="res-summary-tab" class="result-content active">
+            <div class="content-header">
+                <h3>Summary</h3>
+                <button class="copy-btn btn secondary-btn" data-copy="res-summary">📋 Copy</button>
+            </div>
+            <div id="res-summary" class="preview-box"></div>
+            
+            <button id="explainBeginnerBtn" class="btn secondary-btn" style="margin-top: 15px;">Explain Like I'm a Beginner</button>
+            <div id="beginnerExplanationCard" class="result-card" style="display: none; margin-top: 15px; background: rgba(106, 17, 203, 0.1); border-color: var(--primary-color);">
+                <h3>🧠 Beginner Explanation</h3>
+                <div id="res-beginner" class="preview-box" style="background: transparent; border: none;"></div>
+            </div>
+        </div>
+        
+        <div id="res-points-tab" class="result-content" style="display: none;">
+            <div class="content-header">
+                <h3>Important Points</h3>
+                <button class="copy-btn btn secondary-btn" data-copy="res-points">📋 Copy</button>
+            </div>
+            <ul id="res-points" class="preview-box list-box"></ul>
+        </div>
+        
+        <div id="res-keywords-tab" class="result-content" style="display: none;">
+            <div class="content-header">
+                <h3>Keywords</h3>
+                <button class="copy-btn btn secondary-btn" data-copy="res-keywords-list">📋 Copy</button>
+            </div>
+            <div id="res-keywords" class="keyword-tags"></div>
+            <div id="res-keywords-list" style="display:none;"></div> <!-- For easy copying -->
+        </div>
+        
+        <div id="res-questions-tab" class="result-content" style="display: none;">
+            <div class="content-header">
+                <h3>Questions</h3>
+                <button class="copy-btn btn secondary-btn" data-copy="res-questions-raw">📋 Copy</button>
+            </div>
+            <div id="res-questions" class="preview-box qa-box"></div>
+            <div id="res-questions-raw" style="display:none;"></div>
+        </div>
+        
+        <div id="res-mcqs-tab" class="result-content" style="display: none;">
+            <div class="content-header">
+                <h3>Multiple Choice Questions</h3>
+                <button class="copy-btn btn secondary-btn" data-copy="res-mcqs-raw">📋 Copy</button>
+            </div>
+            <div id="res-mcqs" class="preview-box qa-box"></div>
+            <div id="res-mcqs-raw" style="display:none;"></div>
+        </div>
+        
+        <div id="res-revision-tab" class="result-content" style="display: none;">
+             <div class="content-header">
+                <h3>Revision Notes</h3>
+                <button class="copy-btn btn secondary-btn" data-copy="res-revision">📋 Copy</button>
+            </div>
+            <div id="res-revision" class="preview-box" style="font-family: monospace;"></div>
+        </div>
+    </div>
+    
+    <div class="download-container" style="display: flex; justify-content: center; gap: 15px; margin-top:30px;">
+        <button id="downloadTxtBtn" class="btn primary-btn download-btn">📥 Download TXT</button>
+        <button id="downloadPdfBtn" class="btn secondary-btn download-btn">📄 Download PDF</button>
+    </div>
+</section>
+{% endblock %}
