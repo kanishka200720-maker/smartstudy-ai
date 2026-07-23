@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     resultTabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             resultTabBtns.forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.result-content').forEach(c => c.style.display = 'none');
+            document.querySelectorAll('.result-content-section').forEach(c => c.style.display = 'none');
             
             btn.classList.add('active');
             document.getElementById(btn.dataset.target).style.display = 'block';
@@ -116,21 +116,15 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedFiles.forEach((file, index) => {
             totalSize += file.size;
             const li = document.createElement('li');
-            li.style.display = 'flex';
-            li.style.justifyContent = 'space-between';
-            li.style.alignItems = 'center';
-            li.style.padding = '8px 12px';
-            li.style.background = 'rgba(255,255,255,0.05)';
-            li.style.borderRadius = '8px';
-            li.style.border = '1px solid var(--glass-border)';
+            li.className = 'file-item';
             
             const sizeKB = (file.size / 1024).toFixed(1);
             li.innerHTML = `
-                <div style="display:flex; flex-direction:column;">
-                    <span style="font-weight:600; font-size:0.9rem;">📄 ${file.name}</span>
-                    <span style="font-size:0.8rem; color:var(--text-muted);">${sizeKB} KB</span>
+                <div class="file-info">
+                    <span class="file-name">📄 ${file.name}</span>
+                    <span class="file-size">${sizeKB} KB</span>
                 </div>
-                <button type="button" class="btn secondary-btn" style="padding:4px 8px; font-size:0.8rem;" onclick="removeFile(${index})">❌</button>
+                <button type="button" class="remove-file-btn" onclick="removeFile(${index})">❌</button>
             `;
             ul.appendChild(li);
         });
@@ -175,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hideAlerts();
         resultsSection.style.display = 'none';
         emptyState.style.display = 'none';
-        loadingIndicator.style.display = 'flex'; 
+        loadingIndicator.style.display = 'block'; 
         simulateProgress();
         
         const startTime = Date.now();
@@ -268,34 +262,25 @@ document.addEventListener('DOMContentLoaded', () => {
             
             results.individual_files.forEach((doc) => {
                 const docDiv = document.createElement('div');
-                docDiv.style.marginBottom = '15px';
-                docDiv.style.border = '1px solid var(--glass-border)';
-                docDiv.style.borderRadius = '12px';
-                docDiv.style.overflow = 'hidden';
-                docDiv.style.background = 'rgba(255,255,255,0.03)';
+                docDiv.className = 'doc-accordion';
                 
                 const header = document.createElement('div');
-                header.style.padding = '12px 15px';
-                header.style.background = 'rgba(106, 17, 203, 0.15)';
-                header.style.cursor = 'pointer';
-                header.style.fontWeight = 'bold';
-                header.style.display = 'flex';
-                header.style.justifyContent = 'space-between';
+                header.className = 'doc-accordion-header';
                 header.innerHTML = `<span>📄 ${doc.filename}</span><span>▼</span>`;
                 
                 const content = document.createElement('div');
-                content.style.padding = '15px';
-                content.style.display = 'none';
+                content.className = 'doc-accordion-content';
                 content.innerHTML = `
-                    <h4 style="margin-top:0; color:var(--text-color);">Summary</h4>
-                    <p style="font-size:0.95rem; color:var(--text-muted);">${doc.summary || 'No summary generated.'}</p>
-                    <h4 style="color:var(--text-color);">Keywords</h4>
+                    <h4 style="margin-top:0;">Summary</h4>
+                    <p style="font-size:0.95rem;">${doc.summary || 'No summary generated.'}</p>
+                    <h4>Keywords</h4>
                     <div class="keyword-tags">${(doc.keywords || []).map(k => `<span class="keyword-tag">${k}</span>`).join('')}</div>
                 `;
                 
                 header.addEventListener('click', () => {
-                    content.style.display = content.style.display === 'none' ? 'block' : 'none';
-                    header.querySelector('span:last-child').textContent = content.style.display === 'none' ? '▼' : '▲';
+                    const isHidden = content.style.display === '' || content.style.display === 'none';
+                    content.style.display = isHidden ? 'block' : 'none';
+                    header.querySelector('span:last-child').textContent = isHidden ? '▲' : '▼';
                 });
                 
                 docDiv.appendChild(header);
@@ -459,7 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Ensure all tabs are visible for PDF export
         const oldDisplays = [];
-        document.querySelectorAll('.result-content').forEach((el, idx) => {
+        document.querySelectorAll('.result-content-section').forEach((el, idx) => {
             oldDisplays[idx] = el.style.display;
             el.style.display = 'block';
         });
@@ -468,7 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Restore everything
             document.querySelectorAll('.copy-btn').forEach(b => b.style.display = 'block');
             document.getElementById('explainBeginnerBtn').style.display = 'block';
-            document.querySelectorAll('.result-content').forEach((el, idx) => {
+            document.querySelectorAll('.result-content-section').forEach((el, idx) => {
                 el.style.display = oldDisplays[idx];
             });
         });
