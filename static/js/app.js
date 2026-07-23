@@ -107,12 +107,12 @@ document.addEventListener('DOMContentLoaded', () => {
         let totalSize = 0;
         
         if (selectedFiles.length === 0) {
-            listContainer.style.display = 'none';
+            listContainer.classList.add('hidden');
             fileInput.value = '';
             return;
         }
         
-        listContainer.style.display = 'block';
+        listContainer.classList.remove('hidden');
         selectedFiles.forEach((file, index) => {
             totalSize += file.size;
             const li = document.createElement('li');
@@ -157,19 +157,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function simulateProgress() {
         const statusText = document.getElementById('loaderStatusText');
-        const bar = document.getElementById('loaderProgressBar');
-        bar.style.width = '0%';
         
-        setTimeout(() => { statusText.textContent = '📄 Reading Document...'; bar.style.width = '30%'; }, 100);
-        setTimeout(() => { statusText.textContent = '🧠 Generating Summary & Points...'; bar.style.width = '60%'; }, 1200);
-        setTimeout(() => { statusText.textContent = '❓ Formulating Questions...'; bar.style.width = '90%'; }, 2400);
+        setTimeout(() => { statusText.textContent = 'Reading Document...'; }, 100);
+        setTimeout(() => { statusText.textContent = 'Generating Summary & Points...'; }, 1200);
+        setTimeout(() => { statusText.textContent = 'Formulating Questions...'; }, 2400);
     }
 
     function submitData(formData, mode) {
         hideAlerts();
-        resultsSection.style.display = 'none';
+        resultsSection.classList.add('hidden');
         emptyState.style.display = 'none';
-        loadingIndicator.style.display = 'block'; 
+        loadingIndicator.classList.remove('hidden');
         simulateProgress();
         
         const startTime = Date.now();
@@ -178,10 +176,9 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(response => response.json().then(data => ({ status: response.status, body: data })))
         .then(result => {
             const timeTaken = ((Date.now() - startTime) / 1000).toFixed(1);
-            document.getElementById('loaderProgressBar').style.width = '100%';
             
             setTimeout(() => {
-                loadingIndicator.style.display = 'none';
+                loadingIndicator.classList.add('hidden');
                 
                 if (result.body.failed_files && result.body.failed_files.length > 0) {
                     showAlert(`Warning: Failed to process ${result.body.failed_files.join(', ')}`, 'error');
@@ -204,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 500); // Give progress bar time to hit 100
         })
         .catch(error => {
-            loadingIndicator.style.display = 'none';
+            loadingIndicator.classList.add('hidden');
             showAlert('Processing failure. Please try again.', 'error');
             emptyState.style.display = 'block';
         });
@@ -295,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
         beginnerExplanationText = displayResults.beginner_explanation || results.beginner_explanation;
         
         // Hide beginner explanation by default
-        document.getElementById('beginnerExplanationCard').style.display = 'none';
+        document.getElementById('beginnerExplanationCard').classList.add('hidden');
         
         // Summary
         document.getElementById('res-summary').textContent = displayResults.summary || "No summary generated.";
@@ -375,7 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
             visibleTabs[0].click();
         }
         
-        resultsSection.style.display = 'block';
+        resultsSection.classList.remove('hidden');
         resultsSection.scrollIntoView({ behavior: 'smooth' });
     }
     
@@ -383,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('explainBeginnerBtn').addEventListener('click', () => {
         const card = document.getElementById('beginnerExplanationCard');
         document.getElementById('res-beginner').textContent = beginnerExplanationText || "Could not generate beginner explanation.";
-        card.style.display = 'block';
+        card.classList.remove('hidden');
     });
 
     // Copy Handlers
